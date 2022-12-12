@@ -1,4 +1,4 @@
-all: clean server client 
+all: clean server client clear
 
 server: sender.o
 	gcc -o server sender.o
