@@ -46,12 +46,12 @@ int main()
         int fileSize = write_file(sock);
         printf("File received. Size: %d \n", fileSize);
         char ans[10] = {0};
-        printf("Do you want to try again? (yes/): ");
+        printf("Do you want to try again? (yes/*): ");
         scanf("%s", ans);
         if (strcmp(ans, "yes"))
         {
             flag = 0;
-            int sendCount = send(sock, "Exit", 4, 0);
+            int sendCount = send(sock, "Exit", 5, 0);
             if (sendCount < 0)
             {
                 printf("Error sending message. errno: %d\n", errno);

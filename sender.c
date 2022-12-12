@@ -74,7 +74,7 @@ int main()
     printf("Connection accepted\n");
     //----------------Read file--------------------
     printf("Read file\n");
-    FILE *fp = fopen("./full.png", "r");
+    FILE *fp = fopen("./pic.png", "r");
     if (fp == NULL)
     {
       printf("Error opening file\n");
@@ -83,11 +83,12 @@ int main()
     fseek(fp, 0L, SEEK_END);
     int sz = ftell(fp);
     printf("File size: %d\n", sz);
+    int flag = 1;
 
     //----------------------------------------------
-    while (1)
+    while (flag)
     {
-
+      printf("Sending files\n");
       if (setsockopt(listeningSocket, IPPROTO_TCP, TCP_CONGESTION, "cubic", 6) < 0)
       {
         printf("Error setting socket options : %d", errno);
@@ -163,15 +164,14 @@ int main()
       }
       else if (!strcmp(buffer, "Exit"))
       {
-        break;
+        flag = 0;
       }
       printf("Ans: %s\n", buffer);
     }
-
-    fclose(fp);
+    printf("Closing connection\n");
     close(clientSocket);
+    fclose(fp);
   }
-
   close(listeningSocket);
 
   return 0;
