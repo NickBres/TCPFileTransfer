@@ -6,6 +6,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <netinet/tcp.h>
+#include <time.h>
 
 #define SERVER_PORT 5300
 #define SERVER_IP_ADDRESS "127.0.0.1"
@@ -38,59 +40,57 @@ int main()
         printf("Error connecting to server. errno: %d", errno);
         return -1;
     }
-    printf("Connected to server\n");
+    printf("1.Connected to server\n");
 
     int flag = 1;
     while (flag)
     {
-        int fileSize = write_file(sock);
-        printf("File received. Size: %d \n", fileSize);
-        char ans[10] = {0};
-        printf("Do you want to try again? (yes/*): ");
-        scanf("%s", ans);
-        if (strcmp(ans, "yes"))
+        double avgTime = 0;
+        if (setsockopt(sock, IPPROTO_TCP, TCP_CONGESTION, "cubic", 6) < 0)
         {
-            flag = 0;
-            int sendCount = send(sock, "Exit", 5, 0);
-            if (sendCount < 0)
-            {
-                printf("Error sending message. errno: %d\n", errno);
-                return -1;
-            }
-            else if (sendCount == 0)
-            {
-                printf("Connection closed by server\n");
-                break;
-            }
-            close(sock);
-        }else{
-            int sendCount = send(sock, "Again", 6, 0);
-            if (sendCount < 0)
-            {
-                printf("Error sending message. errno: %d\n", errno);
-                return -1;
-            }
-            else if (sendCount == 0)
-            {
-                printf("Connection closed by server\n");
-                break;
-            }
+            printf("Error setting socket options : %d", errno);
+            return -1;
         }
-
+        printf("    Congestion control algorithm: Cubic\n");
+        int fileSize = write_file(sock, &avgTime);
+        printf("10.File received. Size: %d AvgTimeForHalf: %f\n", fileSize, avgTime);
+        char ans[10] = {0};
+        printf("    Waiting for server to approve and finish\n");
+        int recvSize = recv(sock, ans, 10, 0);
+        if (recvSize < 0)
+        {
+            printf("Error receiving message. errno: %d\n", errno);
+            return -1;
+        }
+        else if (recvSize == 0)
+        {
+            printf("Connection closed by server\n");
+            break;
+        }else if(strcmp(ans, "Exit") == 0){
+            printf("    Approved.\n");
+            flag = 0;
+        }
+        send(sock, "OK", 2, 0);
     }
+    printf("    Connection closed\n");
+    close(sock);
+    return 0;
 }
 
-int write_file(int sockfd)
+int write_file(int sockfd, double *avgTime)
 {
     FILE *fp;
     char buffer[BUFF_SIZE] = {0};
+    clock_t start, end;
+    double cpu_time_used_1, cpu_time_used_2;
 
-    fp = fopen("recv.png", "w");
+    fp = fopen("recv.txt", "w");
     if (fp == NULL)
     {
         printf("Error opening file");
         return 1;
     }
+    start = clock();
     while (1)
     {
         int recvSize = recv(sockfd, buffer, BUFF_SIZE, 0);
@@ -107,8 +107,14 @@ int write_file(int sockfd)
 
         if (strcmp(buffer, "SEND ME A KEY") == 0)
         {
+            printf("3.First part recieved\n");
             createKey(buffer); // puts the key in the buffer
             int bytesSent = send(sockfd, buffer, 10, 0);
+
+            end = clock();
+            cpu_time_used_1 = ((double)(end - start)) / CLOCKS_PER_SEC;
+            printf("4.Time taken: %f\n", cpu_time_used_1);
+
             if (bytesSent < 0)
             {
                 printf("Error sending message. errno: %d\n", errno);
@@ -119,10 +125,22 @@ int write_file(int sockfd)
                 printf("Connection closed by server\n");
                 break;
             }
+            printf("6.Key sent\n");
+            if (setsockopt(sockfd, IPPROTO_TCP, TCP_CONGESTION, "reno", 6) < 0)
+            {
+                printf("Error setting socket options : %d", errno);
+                return -1;
+            }
+            printf("    Congestion control algorithm: Reno\n");
+            
+            start = clock();
         }
         else if (strcmp(buffer, "FINISHED") == 0)
         {
-            printf("File received successfully\n");
+            end = clock();
+            cpu_time_used_2 = ((double)(end - start)) / CLOCKS_PER_SEC;
+            printf("7.Second part recieved\n");
+            printf("8.Time taken: %f\n", cpu_time_used_2);
             break;
         }
         else
@@ -148,6 +166,7 @@ int write_file(int sockfd)
     int sz = ftell(fp);
     rewind(fp);
     fclose(fp);
+    *avgTime = (cpu_time_used_1 + cpu_time_used_2) / 2;
     return sz;
 }
 

@@ -16,6 +16,20 @@
 
 int main()
 {
+  //----------------Read file--------------------
+  printf("1.Read file\n");
+  FILE *fp = fopen("./book.txt", "r");
+  if (fp == NULL)
+  {
+    printf("Error opening file\n");
+    return -1;
+  }
+  fseek(fp, 0L, SEEK_END);
+  int sz = ftell(fp);
+  printf("  File size: %d\n", sz);
+  int flag = 1;
+
+  //----------------------------------------------
 
   signal(SIGPIPE, SIG_IGN);
 
@@ -45,7 +59,7 @@ int main()
     printf("Error binding socket : %d", errno);
     return -1;
   }
-  printf("Binding successful\n");
+  // printf("Binding successful\n");
 
   if (listen(listeningSocket, 1) < 0)
   {
@@ -55,12 +69,11 @@ int main()
 
   struct sockaddr_in clientAddress;
   socklen_t clientAddressLength = sizeof(clientAddress);
-  printf("Waiting for connections\n");
 
   while (1)
   {
-    clock_t start, end;
-    double cpu_time_used_1, cpu_time_used_2;
+
+    printf("2.Waiting for connections\n");
 
     memset(&clientAddress, 0, sizeof(clientAddress));
     clientAddressLength = sizeof(clientAddress);
@@ -71,40 +84,24 @@ int main()
       printf("Error accepting connection : %d", errno);
       return -1;
     }
-    printf("Connection accepted\n");
-    //----------------Read file--------------------
-    printf("Read file\n");
-    FILE *fp = fopen("./pic.png", "r");
-    if (fp == NULL)
-    {
-      printf("Error opening file\n");
-      return -1;
-    }
-    fseek(fp, 0L, SEEK_END);
-    int sz = ftell(fp);
-    printf("File size: %d\n", sz);
-    int flag = 1;
+    printf("  Connection accepted\n");
 
-    //----------------------------------------------
     while (flag)
     {
-      printf("Sending files\n");
       if (setsockopt(listeningSocket, IPPROTO_TCP, TCP_CONGESTION, "cubic", 6) < 0)
       {
         printf("Error setting socket options : %d", errno);
         return -1;
       }
+      printf("  Congestion control changed to cubic\n");
       fseek(fp, 0L, SEEK_SET);
       // sending first part of the file to client
-      start = clock();
+
       int sent = send_file(fp, clientSocket, sz / 2, 0);
-      printf("First part sent: %d\n", sent);
-      end = clock();
-      cpu_time_used_1 = ((double)(end - start)) / CLOCKS_PER_SEC;
-      printf("Time taken: %f\n", cpu_time_used_1);
+      printf("3.First part sent: %d\n", sent);
 
       //--checking key and sending second part of the file---
-      printf("Waiting for KEY\n");
+      printf("4.Waiting for KEY\n");
       int ans = send(clientSocket, "SEND ME A KEY", 14, 0);
 
       char buffer[10] = {0};
@@ -119,7 +116,7 @@ int main()
       }
       else
       {
-        printf("Key received\n");
+        printf("  Key received\n");
       }
       if (checkKey(buffer))
       {
@@ -128,12 +125,9 @@ int main()
           printf("Error setting socket options : %d", errno);
           return -1;
         }
-        start = clock();
+        printf("5.Congestion control changed to reno\n");
         sent = send_file(fp, clientSocket, sz, sz / 2);
-        printf("Second part sent: %d\n", sent);
-        end = clock();
-        cpu_time_used_2 = ((double)(end - start)) / CLOCKS_PER_SEC;
-        printf("Time taken: %f\n", cpu_time_used_2);
+        printf("6.Second part sent: %d\n", sent);
       }
       int fnsh = send(clientSocket, "FINISHED", 9, 0);
       if (fnsh < 0)
@@ -146,27 +140,37 @@ int main()
         printf("Connection closed by server\n");
         exit(1);
       }
+      char msg[10] = {0};
+      printf("7.Need to send again? (yes/*)\n");
+      scanf("%s", msg);
+      if (strcmp(msg, "yes") == 0)
+      {
+        flag = 1;
+      }
       else
       {
-        printf("Finished sending\n");
+        flag = 0;
+        strcpy(msg, "Exit");
       }
-      bzero(buffer, 10);
-      ans = recv(clientSocket, buffer, 10, 0);
-      if (ans < 0)
+      sent = send(clientSocket, msg, 10, 0);
+      if (sent < 0)
       {
-        perror("[-]Error in receiving file.");
+        perror("[-]Error in sending file.");
         exit(1);
       }
-      else if (ans == 0)
+      else if (sent == 0)
       {
         printf("Connection closed by server\n");
         exit(1);
       }
-      else if (!strcmp(buffer, "Exit"))
+      bzero(msg, 10);
+      recv(clientSocket, msg, 10, 0);
+      if (strcmp(msg, "OK"))
       {
-        flag = 0;
+        printf("%s\n", msg);
+        perror("[-]ACK not received correctly");
+        exit(1);
       }
-      printf("Ans: %s\n", buffer);
     }
     printf("Closing connection\n");
     close(clientSocket);
@@ -244,13 +248,13 @@ int checkKey(char *key)
   sprintf(textKey, "%d", myKey);
   if (strcmp(key, textKey) != 0)
   {
-    printf("Wrong key!\n");
-    printf("Key: %s\nmyKey: %s\n", key, textKey);
+    printf("  Wrong key!\n");
+    printf("  Key: %s\nmyKey: %s\n", key, textKey);
     return 0;
   }
   else
   {
-    printf("Correct key!\n");
+    printf("  Correct key!\n");
     return 1;
   }
 };
