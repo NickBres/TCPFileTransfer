@@ -34,12 +34,6 @@ int main()
     return -1;
   }
 
-  if (setsockopt(listeningSocket, IPPROTO_TCP, TCP_CONGESTION, "cubic", 6) < 0)
-  {
-    printf("Error setting socket options : %d", errno);
-    return -1;
-  }
-
   struct sockaddr_in serverAddress;
   memset(&serverAddress, 0, sizeof(serverAddress));
   serverAddress.sin_family = AF_INET;
@@ -65,8 +59,8 @@ int main()
 
   while (1)
   {
-    clock_t start,end;
-    double cpu_time_used_1,cpu_time_used_2;
+    clock_t start, end;
+    double cpu_time_used_1, cpu_time_used_2;
 
     memset(&clientAddress, 0, sizeof(clientAddress));
     clientAddressLength = sizeof(clientAddress);
@@ -89,16 +83,23 @@ int main()
     fseek(fp, 0L, SEEK_END);
     int sz = ftell(fp);
     printf("File size: %d\n", sz);
-    fseek(fp, 0L, SEEK_SET);
+
     //----------------------------------------------
     while (1)
     {
+
+      if (setsockopt(listeningSocket, IPPROTO_TCP, TCP_CONGESTION, "cubic", 6) < 0)
+      {
+        printf("Error setting socket options : %d", errno);
+        return -1;
+      }
+      fseek(fp, 0L, SEEK_SET);
       // sending first part of the file to client
       start = clock();
       int sent = send_file(fp, clientSocket, sz / 2, 0);
       printf("First part sent: %d\n", sent);
       end = clock();
-      cpu_time_used_1 = ((double) (end - start)) / CLOCKS_PER_SEC;
+      cpu_time_used_1 = ((double)(end - start)) / CLOCKS_PER_SEC;
       printf("Time taken: %f\n", cpu_time_used_1);
 
       //--checking key and sending second part of the file---
@@ -130,7 +131,7 @@ int main()
         sent = send_file(fp, clientSocket, sz, sz / 2);
         printf("Second part sent: %d\n", sent);
         end = clock();
-        cpu_time_used_2 = ((double) (end - start)) / CLOCKS_PER_SEC;
+        cpu_time_used_2 = ((double)(end - start)) / CLOCKS_PER_SEC;
         printf("Time taken: %f\n", cpu_time_used_2);
       }
       int fnsh = send(clientSocket, "FINISHED", 9, 0);
