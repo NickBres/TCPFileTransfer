@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <netinet/tcp.h>
 #include <time.h>
+#include <sys/time.h>
 
 #define SERVER_PORT 5300
 #define SERVER_IP_ADDRESS "127.0.0.1"
@@ -87,8 +88,9 @@ int write_file(int sockfd, double *avgTime)
 {
     FILE *fp;
     char buffer[BUFF_SIZE] = {0};
-    clock_t start, end;
-    double cpu_time_used_1, cpu_time_used_2;
+    struct timeval begin,end;
+    double cpu_time_used_1, cpu_time_used_2; 
+    long seconds, microseconds;
 
     fp = fopen("recv.txt", "w"); // create file
     if (fp == NULL)
@@ -96,7 +98,7 @@ int write_file(int sockfd, double *avgTime)
         printf("Error opening file");
         return 1;
     }
-    start = clock(); // start timer to measure time for first part
+    gettimeofday(&begin, NULL); // start timer to measure time for first part
     while (1)
     {
         int recvSize = recv(sockfd, buffer, BUFF_SIZE, 0); // receive data from server
@@ -115,8 +117,11 @@ int write_file(int sockfd, double *avgTime)
         {
             printf("3.First part recieved\n");
 
-            end = clock();                                              // stop timer
-            cpu_time_used_1 = ((double)(end - start)) / CLOCKS_PER_SEC; // calculate time for first part
+            gettimeofday(&end, NULL); // stop timer
+            seconds = end.tv_sec - begin.tv_sec; // calculate time for first part
+            microseconds = end.tv_usec - begin.tv_usec;
+            cpu_time_used_1 = seconds + microseconds*1e-6;
+
             printf("4.Time taken: %f\n", cpu_time_used_1);
 
             createKey(buffer);                           // puts the key in the buffer
@@ -139,13 +144,16 @@ int write_file(int sockfd, double *avgTime)
                 return -1;
             }
             printf("    Congestion control algorithm: %s\n", CC_2);
-
-            start = clock(); // start timer for second part
+            
+            gettimeofday(&begin, NULL); // start timer for second part
         }
         else if (strcmp(buffer, "FINISHED") == 0) // server says that it finished to send the file
         {
-            end = clock();                                              // stop timer for second part
-            cpu_time_used_2 = ((double)(end - start)) / CLOCKS_PER_SEC; // calculate time for second part
+            gettimeofday(&end, NULL); // stop timer for second part
+            seconds = end.tv_sec - begin.tv_sec; // calculate time for second part
+            microseconds = end.tv_usec - begin.tv_usec;
+            cpu_time_used_2 = seconds + microseconds*1e-6;
+
             printf("7.Second part recieved\n");
             printf("8.Time taken: %f\n", cpu_time_used_2);
             break;
