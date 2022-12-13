@@ -18,6 +18,10 @@
 
 int main()
 {
+    double dataSet[BUFF_SIZE] = {0}; // data set buffer. to save the time of each part of the file. max BUFF_SIZE/2 files
+    double *pDataSet = dataSet;
+    double **ppDataSet = &pDataSet;
+
     int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP); // create socket
 
     if (sock < 0)
@@ -47,7 +51,6 @@ int main()
     int flag = 1;
     while (flag) // loop until server says to exit
     {
-        double avgTime = 0;
         if (setsockopt(sock, IPPROTO_TCP, TCP_CONGESTION, CC_1, 6) < 0) // change congestion control algorithm
         {
             printf("Error setting socket options : %d", errno);
@@ -55,8 +58,8 @@ int main()
         }
         printf("    Congestion control algorithm: %s\n", CC_1);
 
-        int fileSize = write_file(sock, &avgTime); // start to recieve file and write it
-        printf("10.File received. Size: %d AvgTimeForHalf: %f\n", fileSize, avgTime);
+        int fileSize = write_file(sock, ppDataSet); // start to recieve file and write it
+        printf("10.File received. Size: %d\n", fileSize);
 
         char ans[10] = {0};
         printf("    Waiting for server to approve and finish\n");
@@ -80,15 +83,15 @@ int main()
     }
     printf("    Connection closed\n");
     close(sock); // close socket
+    printDataSet(dataSet); // print data set
     return 0;
 }
 
-int write_file(int sockfd, double *avgTime)
+int write_file(int sockfd, double **ppDataSet)
 {
     FILE *fp;
     char buffer[BUFF_SIZE] = {0};
-    struct timeval begin,end;
-    double cpu_time_used_1, cpu_time_used_2; 
+    struct timeval begin, end;
     long seconds, microseconds;
 
     fp = fopen("recv.txt", "w"); // create file
@@ -116,12 +119,13 @@ int write_file(int sockfd, double *avgTime)
         {
             printf("3.First part recieved\n");
 
-            gettimeofday(&end, NULL); // stop timer
+            gettimeofday(&end, NULL);            // stop timer
             seconds = end.tv_sec - begin.tv_sec; // calculate time for first part
             microseconds = end.tv_usec - begin.tv_usec;
-            cpu_time_used_1 = seconds + microseconds*1e-6;
+            **ppDataSet = seconds + microseconds * 1e-6;
 
-            printf("4.Time taken: %f\n", cpu_time_used_1);
+            printf("4.Time taken: %f\n", **ppDataSet);
+            (*ppDataSet)++;
 
             createKey(buffer);                           // puts the key in the buffer
             int bytesSent = send(sockfd, buffer, 10, 0); // send key to server
@@ -148,13 +152,14 @@ int write_file(int sockfd, double *avgTime)
         }
         else if (strcmp(buffer, "FINISHED") == 0) // server says that it finished to send the file
         {
-            gettimeofday(&end, NULL); // stop timer for second part
+            gettimeofday(&end, NULL);            // stop timer for second part
             seconds = end.tv_sec - begin.tv_sec; // calculate time for second part
             microseconds = end.tv_usec - begin.tv_usec;
-            cpu_time_used_2 = seconds + microseconds*1e-6;
+            **ppDataSet = seconds + microseconds * 1e-6;
 
             printf("7.Second part recieved\n");
-            printf("8.Time taken: %f\n", cpu_time_used_2);
+            printf("8.Time taken: %f\n", **ppDataSet);
+            (*ppDataSet)++;
             break;
         }
         else // its file data
@@ -176,11 +181,10 @@ int write_file(int sockfd, double *avgTime)
         bzero(buffer, BUFF_SIZE); // clear buffer
     }
 
-    fseek(fp, 0L, SEEK_END);                            // go to end of file
-    int sz = ftell(fp);                                 // get file size
-    rewind(fp);                                         // go to start of file
-    fclose(fp);                                         // close file
-    *avgTime = (cpu_time_used_1 + cpu_time_used_2) / 2; // calculate average time for half
+    fseek(fp, 0L, SEEK_END); // go to end of file
+    int sz = ftell(fp);      // get file size
+    rewind(fp);              // go to start of file
+    fclose(fp);              // close file
     return sz;
 }
 
@@ -188,4 +192,30 @@ void createKey(char *buffer)
 {
     int key = 3498 ^ 420;
     sprintf(buffer, "%d", key); // put key in buffer
+}
+
+void printDataSet(double *pDataSet)
+{
+    int count = 0;
+    double sum1 = 0, sum2 = 0, sum3 = 0;
+    printf("--------------------\nData set analysis:\n--------------------\n");
+    while (*pDataSet && count < BUFF_SIZE)
+    {
+        if (count % 2 == 0)
+        {
+            printf("%d.\n    First part (%s): %f sec\n", count/2 + 1, CC_1, *pDataSet);
+            sum1 += *pDataSet;
+        }
+        else
+        {
+            printf("    Second part (%s): %f sec\n    General: %f sec\n", CC_2, *pDataSet, *pDataSet + *(pDataSet - 1));
+            sum3 += *pDataSet + *(pDataSet - 1);
+            sum2 += *pDataSet;
+        }
+        pDataSet++;
+        count++;
+    }
+    count /= 2;
+    printf("Average time:\n    First part (%s): %f sec\n    Second part (%s): %f sec\n    General: %f sec\n",CC_1, sum1 / count,CC_2, sum2 / count,sum3 / count);
+    printf("--------------------\n");
 }
