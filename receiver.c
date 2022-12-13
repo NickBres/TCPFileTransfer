@@ -11,6 +11,8 @@
 
 #define SERVER_PORT 5300
 #define SERVER_IP_ADDRESS "127.0.0.1"
+#define CC_1 "cubic"
+#define CC_2 "reno"
 
 #define BUFF_SIZE 1024
 
@@ -46,16 +48,15 @@ int main()
     while (flag) // loop until server says to exit
     {
         double avgTime = 0;
-        if (setsockopt(sock, IPPROTO_TCP, TCP_CONGESTION, "cubic", 6) < 0) // change congestion control algorithm
+        if (setsockopt(sock, IPPROTO_TCP, TCP_CONGESTION, CC_1, 6) < 0) // change congestion control algorithm
         {
             printf("Error setting socket options : %d", errno);
             return -1;
         }
-        printf("    Congestion control algorithm: Cubic\n");
+        printf("    Congestion control algorithm: %s\n", CC_1);
 
         int fileSize = write_file(sock, &avgTime); // start to recieve file and write it
         printf("10.File received. Size: %d AvgTimeForHalf: %f\n", fileSize, avgTime);
-
 
         char ans[10] = {0};
         printf("    Waiting for server to approve and finish\n");
@@ -69,11 +70,13 @@ int main()
         {
             printf("Connection closed by server\n");
             break;
-        }else if(strcmp(ans, "Exit") == 0){ // server says to exit
+        }
+        else if (strcmp(ans, "Exit") == 0)
+        { // server says to exit
             printf("    Approved.\n");
             flag = 0;
         }
-        send(sock, "OK", 2, 0);// send ACK to server
+        send(sock, "OK", 2, 0); // send ACK to server
     }
     printf("    Connection closed\n");
     close(sock); // close socket
@@ -111,12 +114,13 @@ int write_file(int sockfd, double *avgTime)
         if (strcmp(buffer, "SEND ME A KEY") == 0) // server asks for key
         {
             printf("3.First part recieved\n");
-            createKey(buffer); // puts the key in the buffer
-            int bytesSent = send(sockfd, buffer, 10, 0); // send key to server
 
-            end = clock(); // stop timer
+            end = clock();                                              // stop timer
             cpu_time_used_1 = ((double)(end - start)) / CLOCKS_PER_SEC; // calculate time for first part
             printf("4.Time taken: %f\n", cpu_time_used_1);
+
+            createKey(buffer);                           // puts the key in the buffer
+            int bytesSent = send(sockfd, buffer, 10, 0); // send key to server
 
             if (bytesSent < 0)
             {
@@ -129,18 +133,18 @@ int write_file(int sockfd, double *avgTime)
                 break;
             }
             printf("6.Key sent\n");
-            if (setsockopt(sockfd, IPPROTO_TCP, TCP_CONGESTION, "reno", 6) < 0) // change congestion control algorithm
+            if (setsockopt(sockfd, IPPROTO_TCP, TCP_CONGESTION, CC_2, 6) < 0) // change congestion control algorithm
             {
                 printf("Error setting socket options : %d", errno);
                 return -1;
             }
-            printf("    Congestion control algorithm: Reno\n");
-            
+            printf("    Congestion control algorithm: %s\n", CC_2);
+
             start = clock(); // start timer for second part
         }
         else if (strcmp(buffer, "FINISHED") == 0) // server says that it finished to send the file
         {
-            end = clock(); // stop timer for second part
+            end = clock();                                              // stop timer for second part
             cpu_time_used_2 = ((double)(end - start)) / CLOCKS_PER_SEC; // calculate time for second part
             printf("7.Second part recieved\n");
             printf("8.Time taken: %f\n", cpu_time_used_2);
@@ -148,7 +152,7 @@ int write_file(int sockfd, double *avgTime)
         }
         else // its file data
         {
-            fwrite(buffer, 1, recvSize, fp); // write data to file
+            fwrite(buffer, 1, recvSize, fp);             // write data to file
             int ans = send(sockfd, buffer, recvSize, 0); // send ACK to server. ACK is the same data that we received
             if (ans < 0)
             {
@@ -165,10 +169,10 @@ int write_file(int sockfd, double *avgTime)
         bzero(buffer, BUFF_SIZE); // clear buffer
     }
 
-    fseek(fp, 0L, SEEK_END); // go to end of file
-    int sz = ftell(fp); // get file size
-    rewind(fp); // go to start of file
-    fclose(fp); // close file
+    fseek(fp, 0L, SEEK_END);                            // go to end of file
+    int sz = ftell(fp);                                 // get file size
+    rewind(fp);                                         // go to start of file
+    fclose(fp);                                         // close file
     *avgTime = (cpu_time_used_1 + cpu_time_used_2) / 2; // calculate average time for half
     return sz;
 }

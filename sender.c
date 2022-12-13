@@ -13,6 +13,8 @@
 
 #define SERVER_PORT 5300
 #define BUFF_SIZE 1024
+#define CC_1 "cubic"
+#define CC_2 "reno"
 
 int main()
 {
@@ -88,12 +90,12 @@ int main()
 
     while (flag) // send file until user deciedes to stop
     {
-      if (setsockopt(listeningSocket, IPPROTO_TCP, TCP_CONGESTION, "cubic", 6) < 0) // set congestion control
+      if (setsockopt(listeningSocket, IPPROTO_TCP, TCP_CONGESTION, CC_1, 6) < 0) // set congestion control
       {
         printf("Error setting socket options : %d", errno);
         return -1;
       }
-      printf("  Congestion control changed to cubic\n");
+      printf("  Congestion control changed to %s\n", CC_1);
       fseek(fp, 0L, SEEK_SET); // go to the beginning of the file
    
 
@@ -120,12 +122,12 @@ int main()
       }
       if (checkKey(buffer)) // check key
       {
-        if (setsockopt(listeningSocket, IPPROTO_TCP, TCP_CONGESTION, "reno", 5) < 0) // set congestion control
+        if (setsockopt(listeningSocket, IPPROTO_TCP, TCP_CONGESTION, CC_2, 5) < 0) // set congestion control
         {
           printf("Error setting socket options : %d", errno);
           return -1;
         }
-        printf("5.Congestion control changed to reno\n");
+        printf("5.Congestion control changed to %s\n", CC_2);
         sent = send_file(fp, clientSocket, sz, sz / 2); // send second part of the file
         printf("6.Second part sent: %d\n", sent);
       }
