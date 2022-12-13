@@ -7,7 +7,6 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <netinet/tcp.h>
-#include <time.h>
 #include <sys/time.h>
 
 #define SERVER_PORT 5300
@@ -144,7 +143,7 @@ int write_file(int sockfd, double *avgTime)
                 return -1;
             }
             printf("    Congestion control algorithm: %s\n", CC_2);
-            
+
             gettimeofday(&begin, NULL); // start timer for second part
         }
         else if (strcmp(buffer, "FINISHED") == 0) // server says that it finished to send the file

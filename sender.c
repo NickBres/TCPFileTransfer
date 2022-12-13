@@ -9,7 +9,6 @@
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
-#include <time.h>
 
 #define SERVER_PORT 5300
 #define BUFF_SIZE 1024
