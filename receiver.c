@@ -238,14 +238,14 @@ void printDataSet(double *pDataSet,int size)
 
 double* addDataSet(double *dataSet,int *dataSetSize, double data)
 {
-    double *newDS = realloc(dataSet, (*dataSetSize + 1) * sizeof(double));
+    double *newDS = realloc(dataSet, (*dataSetSize + 1) * sizeof(double)); // create new data set with one more element
     if (newDS == NULL)
     {
         printf("Error reallocating memory\n");
         return NULL;
     }
-    newDS[*dataSetSize] = data;
-    (*dataSetSize)++;
+    newDS[*dataSetSize] = data; // add new element
+    (*dataSetSize)++; // increase data set size
     return newDS;
 }
 
