@@ -141,6 +141,20 @@ int main()
         printf("Connection closed by server\n");
         exit(1);
       }
+      bytesReceived = recv(clientSocket, buffer, 3, 0); // receive ack
+      if (bytesReceived < 0)
+      {
+        printf("Error receiving message: %s, errno: %d", strerror(errno), errno);
+      }
+      else if (bytesReceived == 0)
+      {
+        printf("Connection closed by server\n");
+      }
+      else if (strcmp(buffer, "OK") != 0)
+      {
+        printf("  ack is wrong\n");
+        exit(1);
+      }
       char msg[10] = {0};
       printf("7.Need to send again? (yes/*)\n"); // ask user if he wants to send file again
       scanf("%s", msg);
@@ -259,11 +273,4 @@ int checkKey(char *key)
   }
 };
 
-void printArray(char *arr, int size)
-{
-  for (int i = 0; i < size; i++)
-  {
-    printf("%c", arr[i]);
-  }
-  printf("\n");
-}
+

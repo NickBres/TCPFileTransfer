@@ -16,11 +16,13 @@
 
 #define BUFF_SIZE 1024
 
+double* addDataSet(double *dataSet,int *dataSetSize, double data); // reallocate memory, add data to data set, increase data set size
+
 int main()
 {
-    double dataSet[BUFF_SIZE] = {0}; // data set buffer. to save the time of each part of the file. max BUFF_SIZE/2 files
-    double *pDataSet = dataSet;
-    double **ppDataSet = &pDataSet;
+    double *dataSet = NULL; // data set that will save download time for each half of the file
+    double **pDS = &dataSet;
+    int dataSetSize = 0;
 
     int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP); // create socket
 
@@ -58,7 +60,7 @@ int main()
         }
         printf("    Congestion control algorithm: %s\n", CC_1);
 
-        int fileSize = write_file(sock, ppDataSet); // start to recieve file and write it
+        int fileSize = write_file(sock, pDS, &dataSetSize); // start to recieve file and write it
         printf("10.File received. Size: %d\n", fileSize);
 
         char ans[10] = {0};
@@ -83,11 +85,12 @@ int main()
     }
     printf("    Connection closed\n");
     close(sock); // close socket
-    printDataSet(dataSet); // print data set
+    
+    printDataSet(dataSet,dataSetSize); // print data set
     return 0;
 }
 
-int write_file(int sockfd, double **ppDataSet)
+int write_file(int sockfd, double **pDS,int *dataSetSize)
 {
     FILE *fp;
     char buffer[BUFF_SIZE] = {0};
@@ -103,6 +106,7 @@ int write_file(int sockfd, double **ppDataSet)
     gettimeofday(&begin, NULL); // start timer to measure time for first part
     while (1)
     {
+        int ans;
         int recvSize = recv(sockfd, buffer, BUFF_SIZE, 0); // receive data from server
         if (recvSize < 0)
         {
@@ -122,11 +126,10 @@ int write_file(int sockfd, double **ppDataSet)
             gettimeofday(&end, NULL);            // stop timer
             seconds = end.tv_sec - begin.tv_sec; // calculate time for first part
             microseconds = end.tv_usec - begin.tv_usec;
-            **ppDataSet = seconds + microseconds * 1e-6;
-
-            printf("4.Time taken: %f\n", **ppDataSet);
-            (*ppDataSet)++;
-
+            printf("4.Time taken: %f\n", seconds + microseconds * 1e-6);
+            printf("5.Adding time to data set\n");
+            *pDS = addDataSet( *pDS, dataSetSize, seconds + microseconds * 1e-6); // add time to data set
+            
             createKey(buffer);                           // puts the key in the buffer
             int bytesSent = send(sockfd, buffer, 10, 0); // send key to server
 
@@ -152,20 +155,32 @@ int write_file(int sockfd, double **ppDataSet)
         }
         else if (strcmp(buffer, "FINISHED") == 0) // server says that it finished to send the file
         {
+            printf("7.Second part recieved\n");
             gettimeofday(&end, NULL);            // stop timer for second part
             seconds = end.tv_sec - begin.tv_sec; // calculate time for second part
             microseconds = end.tv_usec - begin.tv_usec;
-            **ppDataSet = seconds + microseconds * 1e-6;
+            printf("8.Time taken: %f\n", seconds + microseconds * 1e-6);
+            printf("9.Adding time to data set\n");
+            *pDS = addDataSet( *pDS, dataSetSize, seconds + microseconds * 1e-6); // add time to data set
 
-            printf("7.Second part recieved\n");
-            printf("8.Time taken: %f\n", **ppDataSet);
-            (*ppDataSet)++;
+            ans = send(sockfd, "OK", 3, 0); // send ACK to server
+            if (ans < 0)
+            {
+                printf("Error sending message. errno: %d\n", errno);
+                return -1;
+            }
+            else if (ans == 0)
+            {
+                printf("Connection closed by server\n");
+                break;
+            }
+
             break;
         }
         else // its file data
         {
             fwrite(buffer, 1, recvSize, fp);             // write data to file
-            int ans = send(sockfd, buffer, recvSize, 0); // send ACK to server. ACK is the same data that we received
+            ans = send(sockfd, buffer, recvSize, 0); // send ACK to server. ACK is the same data that we received
             if (ans < 0)
             {
                 printf("Error sending message. errno: %d\n", errno);
@@ -194,12 +209,12 @@ void createKey(char *buffer)
     sprintf(buffer, "%d", key); // put key in buffer
 }
 
-void printDataSet(double *pDataSet)
+void printDataSet(double *pDataSet,int size)
 {
     int count = 0;
     double sum1 = 0, sum2 = 0, sum3 = 0;
     printf("--------------------\nData set analysis:\n--------------------\n");
-    while (*pDataSet && count < BUFF_SIZE)
+    while (count < size)
     {
         if (count % 2 == 0)
         {
@@ -219,3 +234,17 @@ void printDataSet(double *pDataSet)
     printf("Average time:\n    First part (%s): %f sec\n    Second part (%s): %f sec\n    General: %f sec\n",CC_1, sum1 / count,CC_2, sum2 / count,sum3 / count);
     printf("--------------------\n");
 }
+
+double* addDataSet(double *dataSet,int *dataSetSize, double data)
+{
+    double *newDS = realloc(dataSet, (*dataSetSize + 1) * sizeof(double));
+    if (newDS == NULL)
+    {
+        printf("Error reallocating memory\n");
+        return NULL;
+    }
+    newDS[*dataSetSize] = data;
+    (*dataSetSize)++;
+    return newDS;
+}
+
