@@ -87,6 +87,7 @@ int main()
     close(sock); // close socket
     
     printDataSet(dataSet,dataSetSize); // print data set
+    free(dataSet); // free data set
     return 0;
 }
 
