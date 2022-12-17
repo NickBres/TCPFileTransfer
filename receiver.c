@@ -14,7 +14,7 @@
 #define CC_1 "cubic"
 #define CC_2 "reno"
 
-#define BUFF_SIZE 1024
+#define BUFF_SIZE 32768
 
 double* addDataSet(double *dataSet,int *dataSetSize, double data); // reallocate memory, add data to data set, increase data set size
 
@@ -53,13 +53,6 @@ int main()
     int flag = 1;
     while (flag) // loop until server says to exit
     {
-        if (setsockopt(sock, IPPROTO_TCP, TCP_CONGESTION, CC_1, 6) < 0) // change congestion control algorithm
-        {
-            printf("Error setting socket options : %d", errno);
-            return -1;
-        }
-        printf("    Congestion control algorithm: %s\n", CC_1);
-
         int fileSize = write_file(sock, pDS, &dataSetSize); // start to recieve file and write it
         printf("10.File received. Size: %d\n", fileSize);
 
@@ -105,7 +98,7 @@ int write_file(int sockfd, double **pDS,int *dataSetSize)
         return 1;
     }
     gettimeofday(&begin, NULL); // start timer to measure time for first part
-    while (1)
+    while (1) // loop until server says that it finished to send the file
     {
         int ans;
         int recvSize = recv(sockfd, buffer, BUFF_SIZE, 0); // receive data from server
@@ -119,7 +112,6 @@ int write_file(int sockfd, double **pDS,int *dataSetSize)
             printf("Connection closed by server\n");
             break;
         }
-
         if (strcmp(buffer, "SEND ME A KEY") == 0) // server asks for key
         {
             printf("3.First part recieved\n");
@@ -145,13 +137,6 @@ int write_file(int sockfd, double **pDS,int *dataSetSize)
                 break;
             }
             printf("6.Key sent\n");
-            if (setsockopt(sockfd, IPPROTO_TCP, TCP_CONGESTION, CC_2, 6) < 0) // change congestion control algorithm
-            {
-                printf("Error setting socket options : %d", errno);
-                return -1;
-            }
-            printf("    Congestion control algorithm: %s\n", CC_2);
-
             gettimeofday(&begin, NULL); // start timer for second part
         }
         else if (strcmp(buffer, "FINISHED") == 0) // server says that it finished to send the file
@@ -175,8 +160,28 @@ int write_file(int sockfd, double **pDS,int *dataSetSize)
                 printf("Connection closed by server\n");
                 break;
             }
+            break; // all file recieved stop loop
+        }else if(strcmp(buffer, "CC") == 0){
+            int check = send(sockfd, "OK", 3, 0); // send ACK to server
 
-            break;
+            bzero(buffer,BUFF_SIZE);
+            int rcv = recv(sockfd, buffer, 10, 0);
+            if (rcv < 0)
+            {
+                printf("Error receiving message. errno: %d\n", errno);
+                return -1;
+            }
+            else if (rcv == 0)
+            {
+                printf("Connection closed by server\n");
+                break;
+            }
+            if(setsockopt(sockfd, IPPROTO_TCP, TCP_CONGESTION, buffer, strlen(buffer)) < 0){
+                printf("Error setting congestion control algorithm. errno: %d\n", errno);
+                return -1;
+            }
+            printf("    Congestion control algorithm changed to: %s\n", buffer);
+            int ack = send(sockfd, "OK", 3, 0); // send ACK to server
         }
         else // its file data
         {
@@ -202,20 +207,20 @@ int write_file(int sockfd, double **pDS,int *dataSetSize)
     rewind(fp);              // go to start of file
     fclose(fp);              // close file
     return sz;
-}
+};
 
 void createKey(char *buffer)
 {
     int key = 3498 ^ 420;
     sprintf(buffer, "%d", key); // put key in buffer
-}
+};
 
 void printDataSet(double *pDataSet,int size)
 {
     int count = 0;
     double sum1 = 0, sum2 = 0, sum3 = 0;
     printf("--------------------\nData set analysis:\n--------------------\n");
-    while (count < size)
+    while (count < size) // runs on data set and prints the data
     {
         if (count % 2 == 0)
         {
@@ -234,7 +239,7 @@ void printDataSet(double *pDataSet,int size)
     count /= 2;
     printf("Average time:\n    First part (%s): %f sec\n    Second part (%s): %f sec\n    General: %f sec\n",CC_1, sum1 / count,CC_2, sum2 / count,sum3 / count);
     printf("--------------------\n");
-}
+};
 
 double* addDataSet(double *dataSet,int *dataSetSize, double data)
 {
@@ -247,5 +252,7 @@ double* addDataSet(double *dataSet,int *dataSetSize, double data)
     newDS[*dataSetSize] = data; // add new element
     (*dataSetSize)++; // increase data set size
     return newDS;
-}
+};
+
+
 
