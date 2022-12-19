@@ -180,6 +180,11 @@ int write_file(int sockfd, double **pDS,int *dataSetSize)
                 printf("Error setting congestion control algorithm. errno: %d\n", errno);
                 return -1;
             }
+            bzero(buffer,BUFF_SIZE);
+            if(getsockopt(sockfd, IPPROTO_TCP, TCP_CONGESTION, buffer, &rcv) < 0){
+                printf("Error getting congestion control algorithm. errno: %d\n", errno);
+                return -1;
+            }
             printf("    Congestion control algorithm changed to: %s\n", buffer);
             int ack = send(sockfd, "OK", 3, 0); // send ACK to server
         }

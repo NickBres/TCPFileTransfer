@@ -243,12 +243,12 @@ int checkKey(char *key)
   {
     printf("  Wrong key!\n");
     printf("  Key: %s\nmyKey: %s\n", key, textKey);
-    return 0;
+    return FALSE;
   }
   else
   {
     printf("  Correct key!\n");
-    return 1;
+    return TRUE;
   }
 };
 
@@ -301,5 +301,10 @@ void ccChange(int sockfd, char *CC)
     perror("[-]Error in setting socket options");
     exit(1);
   }
+  bzero(buffer, 10);
+  if(getsockopt(sockfd, IPPROTO_TCP, TCP_CONGESTION, buffer, &len) < 0){
+    perror("[-]Error in getting socket options");
+    exit(1);
+  } // get CC name
     printf("  CC changed to %s\n", buffer);
 };
